@@ -1,0 +1,130 @@
+version: "3.8"
+
+networks:
+  internal:
+    driver: bridge
+  traefik:
+    external: true
+name: immich
+
+services:
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    command: [ "start.sh", "immich" ]
+    volumes:
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - database
+    #      - typesense
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.immich-web.rule=Host(`img1.1allen.com`)
+      - traefik.http.services.immich-web.loadbalancer.server.port=3001
+      - traefik.http.routers.immich-web.entrypoints=websecure
+      - traefik.http.routers.immich-web.tls.certresolver=my
+      - traefik.docker.network=traefik
+
+    #      - com.centurylinklabs.watchtower.enable=true
+    #    ports:
+    #      - 3001
+    networks:
+      - internal
+      - traefik
+
+  immich-microservices:
+    container_name: immich_microservices
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    # extends: # uncomment this section for hardware acceleration - see https://immich.app/docs/features/hardware-transcoding
+    #   file: hwaccel.transcoding.yml
+    #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
+    command: [ "start.sh", "microservices" ]
+    volumes:
+      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - database
+    #    labels:
+    #      - com.centurylinklabs.watchtower.enable=true
+    restart: unless-stopped
+    networks:
+      - internal
+
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    # For hardware acceleration, add one of -[armnn, cuda, openvino] to the image tag.
+    # Example tag: ${IMMICH_VERSION:-release}-cuda
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    # extends: # uncomment this section for hardware acceleration - see https://immich.app/docs/features/ml-hardware-acceleration
+    #   file: hwaccel.ml.yml
+    #   service: cpu # set to one of [armnn, cuda, openvino, openvino-wsl] for accelerated inference - use the `-wsl` version for WSL2 where applicable
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - internal
+
+  redis:
+    container_name: immich_redis
+    image: redis:6.2
+    restart: unless-stopped
+    #    labels:
+    #      - com.centurylinklabs.watchtower.enable=true
+    networks:
+      - internal
+
+  database:
+    container_name: immich_postgres
+    image: tensorchord/pgvecto-rs:pg14-v0.1.11
+    env_file:
+      - .env
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    #    labels:
+    #      - com.centurylinklabs.watchtower.enable=true
+    networks:
+      - internal
+  #    ports:
+  #     - 0.0.0.0:5432:5432
+
+  backup:
+    container_name: immich_db_dumper
+    image: prodrigestivill/postgres-backup-local
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: database
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      SCHEDULE: "@daily"
+      BACKUP_NUM_KEEP: 14
+      BACKUP_DIR: /db_dumps
+    volumes:
+      - ./db_dumps:/db_dumps
+    depends_on:
+      - database
+    restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+  model-cache:
