@@ -1,0 +1,25 @@
+version: '3.8'
+
+networks:
+  traefik:
+    external: true
+
+services:
+  multinode:
+    image: storjlabs/multinode:latest
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sno.rule=Host(`${DOMAIN_NAME}`)
+      - traefik.http.services.sno.loadbalancer.server.port=15002
+      - traefik.http.routers.sno.entrypoints=websecure
+      - traefik.http.routers.sno.tls.certresolver=my
+      - "traefik.http.routers.sno.middlewares=myauth"
+      - "traefik.http.middlewares.myauth.basicauth.users=${USERS}"
+      - traefik.docker.network=traefik
+
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - traefik
