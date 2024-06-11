@@ -10,7 +10,6 @@ services:
   immich-server:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
-    command: ['start.sh', 'immich']
     volumes:
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
@@ -35,27 +34,6 @@ services:
     networks:
       - internal
       - traefik
-
-  immich-microservices:
-    container_name: immich_microservices
-    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
-    # extends: # uncomment this section for hardware acceleration - see https://immich.app/docs/features/hardware-transcoding
-    #   file: hwaccel.transcoding.yml
-    #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
-    command: ['start.sh', 'microservices']
-    volumes:
-      - ${UPLOAD_LOCATION}:/usr/src/app/upload
-      - /etc/localtime:/etc/localtime:ro
-    env_file:
-      - .env
-    depends_on:
-      - redis
-      - database
-    #    labels:
-    #      - com.centurylinklabs.watchtower.enable=true
-    restart: unless-stopped
-    networks:
-      - internal
 
   immich-machine-learning:
     container_name: immich_machine_learning
@@ -104,15 +82,17 @@ services:
 
   backup:
     container_name: immich_db_dumper
-    image: prodrigestivill/postgres-backup-local
+    image: prodrigestivill/postgres-backup-local:14
     env_file:
       - .env
     environment:
       POSTGRES_HOST: database
-      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_CLUSTER: 'TRUE'
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
       SCHEDULE: "@daily"
+      POSTGRES_EXTRA_OPTS: '--clean --if-exists'
       BACKUP_NUM_KEEP: 14
       BACKUP_DIR: /db_dumps
     volumes:
