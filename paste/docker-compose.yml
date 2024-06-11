@@ -1,0 +1,29 @@
+
+networks:
+  traefik:
+    external: true
+
+services:
+  microbin:
+    image: danielszabo99/microbin:latest
+    container_name: microbin
+    restart: unless-stopped
+    command: >
+      --public-path 'https://paste.1allen.com'
+      --highlightsyntax
+      --editable
+      --qr
+      --enable-burn-after
+    volumes:
+      - ./data:/app/pasta_data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.paste.rule=Host(`${DOMAIN_NAME}`)
+      - traefik.http.services.paste.loadbalancer.server.port=8080
+      - traefik.http.routers.paste.entrypoints=websecure
+      - traefik.http.routers.paste.tls.certresolver=my
+      - traefik.docker.network=traefik
+
+      - com.centurylinklabs.watchtower.enable=true
+    networks:
+      - traefik
