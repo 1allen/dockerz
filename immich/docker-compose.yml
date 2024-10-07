@@ -1,10 +1,10 @@
+name: immich
 
 networks:
   internal:
     driver: bridge
   traefik:
     external: true
-name: immich
 
 services:
   immich-server:
