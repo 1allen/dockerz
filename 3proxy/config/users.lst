@@ -1,9 +1,1 @@
-# users username[:pwtype:password] ...
-# pwtype is one of:
-# none (empty) - use system authentication
-# CL - password is cleartext
-# CR - password is crypt-style password
-# NT - password is NT password (in hex)
-
-
 user:CL:cleartextPwd
