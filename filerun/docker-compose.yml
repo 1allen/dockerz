@@ -1,0 +1,78 @@
+
+networks:
+  internal:
+    driver: bridge
+  traefik:
+    external: true
+
+services:
+  web:
+    image: filerun/filerun:8.1
+    restart: unless-stopped
+    environment:
+      FR_DB_HOST: db
+      FR_DB_PORT: 3306
+      FR_DB_NAME: your_filerun_database
+      FR_DB_USER: your_filerun_username
+      FR_DB_PASS: your_filerun_password
+      APACHE_RUN_USER: ${RUN_USER:-1000}
+      APACHE_RUN_USER_ID: ${RUN_USER_ID:-1000}
+      APACHE_RUN_GROUP: ${RUN_GROUP:-1000}
+      APACHE_RUN_GROUP_ID: ${RUN_GROUP_ID:-1000}
+    depends_on:
+      - db
+    volumes:
+      - ./data/html:/var/www/html:cached
+      - ./_files:/user-files:cached
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.flrn.rule=Host(`${DOMAIN_NAME}`)
+      - traefik.http.services.flrn.loadbalancer.server.port=80
+      - traefik.http.routers.flrn.entrypoints=websecure
+      - traefik.http.routers.flrn.tls.certresolver=my
+      - traefik.http.routers.flrn.middlewares=flrn-ratelimit,myauth
+
+      - "traefik.http.middlewares.myauth.basicauth.users=${USERS}"
+
+      - traefik.http.middlewares.flrn-ratelimit.ratelimit.period=1m
+      - traefik.http.middlewares.flrn-ratelimit.ratelimit.average=100
+      - traefik.http.middlewares.flrn-ratelimit.ratelimit.burst=50
+
+      - "traefik.http.routers.flrn-noauth1.rule=Host(`${DOMAIN_NAME}`) && PathPrefix(`/status.php`)"
+      - traefik.http.routers.flrn-noauth1.entrypoints=websecure
+      - traefik.http.routers.flrn-noauth1.tls.certresolver=my
+
+      - traefik.http.middlewares.flrn-noauth1.ratelimit.period=1s
+      - traefik.http.middlewares.flrn-noauth1.ratelimit.average=1
+      - traefik.http.middlewares.flrn-noauth1.ratelimit.burst=2
+
+      - "traefik.http.routers.flrn-noauth2.rule=Host(`${DOMAIN_NAME}`) && (PathPrefix(`/dav.php`) || PathPrefix(`/remote.php/dav`))"
+      - traefik.http.routers.flrn-noauth2.entrypoints=websecure
+      - traefik.http.routers.flrn-noauth2.tls.certresolver=my
+
+      - traefik.http.middlewares.flrn-noauth2.ratelimit.period=1s
+      - traefik.http.middlewares.flrn-noauth2.ratelimit.average=25
+      - traefik.http.middlewares.flrn-noauth2.ratelimit.burst=50
+
+      - traefik.http.routers.flrn-noauth1.middlewares=flrn-noauth1
+      - traefik.http.routers.flrn-noauth2.middlewares=flrn-noauth2
+
+      - traefik.docker.network=traefik
+      - "com.centurylinklabs.watchtower.enable=true"
+
+    networks:
+      - internal
+      - traefik
+
+  db:
+    image: mariadb:10
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: your_mysql_root_password
+      MYSQL_USER: your_filerun_username
+      MYSQL_PASSWORD: your_filerun_password
+      MYSQL_DATABASE: your_filerun_database
+    volumes:
+      - ./data/db:/var/lib/mysql:cached
+    networks:
+      - internal
