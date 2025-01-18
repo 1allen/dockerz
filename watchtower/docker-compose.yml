@@ -1,0 +1,17 @@
+
+services:
+  watchtower:
+    image: containrrr/watchtower
+    environment:
+      - WATCHTOWER_SCHEDULE=0 20 4 * * *
+      - WATCHTOWER_TIMEOUT=60s
+      - WATCHTOWER_CLEANUP=true
+      # Update containers that have a `com.centurylinklabs.watchtower.enable` label set to true.
+      - WATCHTOWER_LABEL_ENABLE=true
+#      - WATCHTOWER_DEBUG=true
+#      - WATCHTOWER_POLL_INTERVAL=10
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/localtime:/etc/localtime:ro
