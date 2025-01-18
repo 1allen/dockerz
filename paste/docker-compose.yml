@@ -10,7 +10,7 @@ services:
     container_name: microbin
     restart: unless-stopped
     command: >
-      --public-path 'https://paste.1allen.com'
+      --public-path 'https://${DOMAIN_NAME}'
       --highlightsyntax
       --editable
       --qr
